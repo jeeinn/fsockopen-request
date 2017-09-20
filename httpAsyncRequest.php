@@ -1,6 +1,6 @@
 <?php
 /**
- * http异步请求
+ * 模拟http异步请求
  * Created by JetBrains PhpStorm.
  * User: jeeinn
  * Date: 17-9-20
@@ -18,7 +18,7 @@ class HttpAsyncRequest
     public $protocolVersion = '';
     public $connectTimeout = 1;
     public $urlsQueue = array();
-    public $commonParams = array();
+    public $commonParams = '';
     public $isBlocking = true;
     public $successCb = null;
     public $errorCb = null;
@@ -95,6 +95,11 @@ class HttpAsyncRequest
     }
 
 
+    /**
+     * 添加共同参数
+     * @param array $params
+     * @return $this
+     */
     public function addCommonParams($params = array())
     {
         $this->commonParams = http_build_query($params);
