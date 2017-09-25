@@ -1,11 +1,11 @@
 <?php
 /**
- * 模拟http异步请求
+ * http异步请求
  * Created by JetBrains PhpStorm.
  * User: jeeinn
  * Date: 17-9-20
  * Time: 上午11:20
- * 参考地址：https://segmentfault.com/q/1010000003990460
+* 参考地址：https://segmentfault.com/q/1010000003990460
  */
 class HttpAsyncRequest
 {
@@ -19,7 +19,7 @@ class HttpAsyncRequest
     public $connectTimeout = 1;
     public $urlsQueue = array();
     public $commonParams = '';
-    public $isBlocking = true;
+    public $isBlocking = 1;
     public $successCb = null;
     public $errorCb = null;
 
@@ -114,7 +114,7 @@ class HttpAsyncRequest
     public function setBlocking($enabled = true)
     {
         if(!$enabled){
-            $this->isBlocking = false;
+            $this->isBlocking = 0;
         }
         return $this;
     }
@@ -156,20 +156,27 @@ class HttpAsyncRequest
         $host = $urlInfo['host'];
         $port = isset($urlInfo['port']) ? $urlInfo['port'] : self::DEFAULT_PORT;
         $path = isset($urlInfo['path']) ? $urlInfo['path'] : DIRECTORY_SEPARATOR;
+        $query = isset($urlInfo['query']) ? $urlInfo['query'] : '';
         $params = http_build_query($params);
+
+        $params_pool = array();
+        array_push($params_pool,$params);
+        array_push($params_pool,$this->commonParams);
+        if($method === self::METHOD_GET){
+            array_push($params_pool,$query);
+            $params_pool = array_filter($params_pool);
+            $params = implode($params_pool,'&');
+            $path .= '?'. $params;
+        }
+        if($method === self::METHOD_POST){
+            $params_pool = array_filter($params_pool);
+            $params = implode($params_pool,'&');
+            if($query) $path .= '?'. $query;
+        }
         if($scheme == 'https') {
             $host = 'ssl://' . $host;
         }
-        if($method === self::METHOD_GET && strlen($params) > 0){
-            $path .= '?' . $params;
-        }
-        if(strlen($this->commonParams) > 0){
-            if(strpos($path, '?') === false){
-                $path .= '?' . $this->commonParams;
-            }else{
-                $path .= '&' . $this->commonParams;
-            }
-        }
+
         array_push($this->urlsQueue,array(
             'method'=>  $method,
             'host'  =>  $host,
@@ -201,15 +208,18 @@ class HttpAsyncRequest
     {
         // 遍历执行请求 iterate request
         foreach ($this->urlsQueue as $item){
-            $fp = fsockopen($item['host'], $item['port'], $errorCode, $errorInfo, $this->connectTimeout);
-            stream_set_blocking($fp,$this->isBlocking);
+            $fp = @fsockopen($item['host'], $item['port'], $errorCode, $errorInfo, $this->connectTimeout);
             $response = new stdClass();
             $response->errorCode = $errorCode;
             $response->errorInfo = $errorInfo;
             $response->data = $item;
+            $response->info = array();
             if($fp === false){
                 $this->errorCb($response);
             } else {
+                // 设置是否阻塞
+                stream_set_blocking($fp, $this->isBlocking);
+                $response->info = stream_get_meta_data($fp);
                 // 处理请求头 deal request header
                 $header  = "{$item['method']} {$item['path']} HTTP/$this->protocolVersion\r\n";
                 $header .= "Host: {$item['host']}\r\n";
@@ -225,4 +235,5 @@ class HttpAsyncRequest
             }
         }
     }
+
 }
